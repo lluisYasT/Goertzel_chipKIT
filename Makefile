@@ -1,4 +1,15 @@
-MPIDE:=/home/lluis/mpide
+UNAME=$(shell uname)
+ifeq ($(UNAME),Darwin)
+	MPIDE:=/Applications/Mpide.app/Contents/Resources/Java
+	AVRDUDE=$(MPIDE)/hardware/tools/avr/bin/avrdude
+	AVRDUDECONF=$(MPIDE)/hardware/tools/avr/etc/avrdude.conf
+	SERIAL_PORT=/dev/tty.usbserial-A6009W3L
+else
+	MPIDE:=/home/lluis/mpide
+	AVRDUDE=$(MPIDE)/hardware/tools/avrdude
+	AVRDUDECONF=$(MPIDE)/hardware/tools/avrdude.conf
+	SERIAL_PORT=/dev/ttyUSB0
+endif
 export MPIDE
 TOOLCHAIN_PREFIX=$(MPIDE)/hardware/pic32/compiler/pic32-tools
 CC=$(TOOLCHAIN_PREFIX)/bin/pic32-gcc
@@ -8,10 +19,6 @@ LD=$(CXX)
 OBJCPY=$(TOOLCHAIN_PREFIX)/bin/pic32-objcopy
 BIN2HEX=$(TOOLCHAIN_PREFIX)/bin/pic32-bin2hex
 
-SERIAL_PORT=/dev/ttyUSB0
-
-AVRDUDE=$(MPIDE)/hardware/tools/avrdude
-AVRDUDECONF=$(MPIDE)/hardware/tools/avrdude.conf
 AVRDUDEFLAGS=-C$(AVRDUDECONF) -c stk500v2 -p pic32 -P $(SERIAL_PORT) -b 115200 -v -U
 
 CPUTYPE:=32MX795F512L
@@ -25,7 +32,7 @@ LDSCRIPT=core/chipKIT-application-32MX795F512.ld
 LDFLAGS=-Os -Wl,--gc-sections -mdebugger -mprocessor=$(CPUTYPE)
 
 CFLAGS=-O2 -mno-smart-io -w -fno-exceptions -ffunction-sections -fdata-sections \
-			 -g -mdebugger -Wcast-align -fno-short-double -mprocessor=$(CPUTYPE) \
+			 -mdebugger -Wcast-align -fno-short-double -mprocessor=$(CPUTYPE) \
 			 -DF_CPU=80000000L -DARDUINO=23 -D_BOARD_MEGA_ -DMPIDEVER=0x01000305 \
 			 -DMPIDE=23 -Icore -Icore/variants/$(VARIANT) -Isrc
 
@@ -55,7 +62,7 @@ all: load
 core/core.a:
 	$(MAKE) -C core
 
-%.o: CFLAGS := -c $(CFLAGS)
+%.o: CFLAGS := -c -g $(CFLAGS)
 %.o: %.S
 	$(CXX) $(CFLAGS) $< -o $@
 
@@ -66,14 +73,14 @@ core/core.a:
 	$(CXX) $(CFLAGS) $< -o $@
 
 
-#Si queremos solo compilar sin ensamblar
-%.s: CFLAGS := -S $(CFLAGS)
+#Compilamos pero no ensamblamos
+%.s: CFLAGS := -S -fno-verbose-asm $(CFLAGS)
 %.s: %.c
 	$(CXX) $(CFLAGS) $< -o $@
 %.s: %.cpp
 	$(CXX) $(CFLAGS) $< -o $@
 
-#Si queremos solo preprocesar
+#Solo preprocesamos
 %.ii: CFLAGS := -E $(CFLAGS)
 %.ii: %.cpp
 	$(CXX) $(CFLAGS) $< -o $@
@@ -81,8 +88,15 @@ core/core.a:
 %.i: %.c
 	$(CXX) $(CFLAGS) $< -o $@
 
-link: core/core.a $(LIB_OBJ_S) $(LIB_OBJ_CPP) $(LIB_OBJ_C) $(OBJ_S) $(OBJ_C) $(OBJ_CPP)
+link: core/core.a $(LIB_OBJ_CPP) $(LIB_OBJ_C) $(OBJ_S) $(OBJ_C) $(OBJ_CPP)
+	- @if [[ ! -d bin ]]; then mkdir bin; fi
 	$(LD) $(LDFLAGS) -o bin/main.elf $(OBJ_CPP) $(LIB_OBJ_CPP) $(LIB_OBJ_C) core/core.a -lm -T $(LDSCRIPT) -T$(LDSCRIPT_COMMON) 
+
+link_nobootloader: LDSCRIPT=core/chipKIT-MAX32-application-32MX795F512L-nobootloader.ld
+link_nobootloader: core/core.a $(LIB_OBJ_CPP) $(LIB_OBJ_C) $(OBJ_S) $(OBJ_C) $(OBJ_CPP)
+	- @if [[ ! -d bin ]]; then mkdir bin; fi
+	$(LD) $(LDFLAGS) -o bin/main_nobootloader.elf $(OBJ_CPP) $(LIB_OBJ_CPP) $(LIB_OBJ_C) core/core.a -lm -T $(LDSCRIPT) 
+
 hex: link
 	$(OBJCPY) -O ihex -j .eeprom --set-section-flags=.eeprom=alloc,load \
 		--no-change-warnings --change-section-lma .eeprom=0 bin/main.elf bin/main.eep
