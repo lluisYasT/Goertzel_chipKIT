@@ -45,6 +45,8 @@ void loop()
 		muestras[contador_muestras++] = ADC1BUF0;	// Guardamos el primer valor del ADC
 		IFS1CLR = 0x0002;							// Repetimos
 	}
+	contador_muestras = 0;
+	
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
 		muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
