@@ -5,7 +5,7 @@
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
-#define Fs			62500
+#define Fs			20000
 #define N_MUESTRAS	256
 #define PI			3.141592653589793
 
@@ -39,8 +39,12 @@ void setup()
 
 void loop()
 {
-	while(!muestras_listas);
-	muestras_listas = false;
+	
+	while(contador_muestras < N_MUESTRAS) {
+		while(!IFS1 & 0x0002){};					// Ha acabado la conversion?
+		muestras[contador_muestras++] = ADC1BUF0;	// Guardamos el primer valor del ADC
+		IFS1CLR = 0x0002;							// Repetimos
+	}
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
 		muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
@@ -73,54 +77,25 @@ void loop()
 	IOShieldOled.putString(pot);
 
 	delay(50);
-
-	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
-}
-
-extern "C"
-{
-	void __ISR(_ADC_VECTOR, ipl6) ADCInterruptHandler()
-	{
-		IFS1CLR = 2;
-
-		muestras[contador_muestras++] = ADC1BUF0;
-
-		if(contador_muestras >= N_MUESTRAS)
-		{
-			contador_muestras = 0;
-			muestras_listas = true;
-			AD1CON1bits.ASAM = 0; // Paramos el automuestreo
-		}
-	}
 }
 
 void config_analog()
 {
 	//Configuracion del ADC
-	AD1PCFG = ~1;	// PORTB digital, RB0 analogico
+	AD1PCFG = 0xFFFE;			// PORTB digital, RB0 analogico
+	AD1CON1 = 0x0040;			// Bit SSRC = 010 Para usar TMR3
+
 	AD1CHSbits.CH0SA = 1; // Canal 1. AN1
-	AD1CON2bits.SMPI = 0; // Cantidad de conversiones anates de generar la interrupcion
-	AD1CON1bits.SSRC  = 7; // El contador interno termina el muestreo y comienza la conversion.
-	AD1CON1bits.ASAM = 1; // El muestreo comienza cuando inmediatamente despues de la conversion.
 
-	// Seleccion el reloj del ADC
-	// TPB = (1 / 80MHz) * 2 = 25ns <- Periodo del reloj del bus de perifericos
-	// TAD = TPB * (ADCS + 1) * 2 = 25ns * 20  * 2 = 1000ns
-	// TAD = 25ns * 160 * 2 = 8000ns
-	AD1CON3bits.ADCS = 19;
+	AD1CSSL = 0;
+	AD1CON3 = 0x0000;			// Tiempo de muestreo es TMR3, TAD = TPB (interno) * 2
+	AD1CON2 = 0x0004;			// Interrupcion cuando tenga 2 conversiones
 
-	// Tiempo de Auto muestreo
-	// SAMC * TAD = 30 * 1000ns = 30uS
-	// SAMC * TAD = 31 * 8000ns = 248uS
-	// SAMC * TAD = 25 * 1000ns = 25us
-	AD1CON3bits.SAMC = 4;
+	// Configuramos TMR3 para que venza cada 50 us
+	TMR3 	= 0x0000;
+	PR3 	= 0x01F4;			500 decimal
+	T3CON 	= 0x8010;
 
-	// Tiempo total = Tmuestreo + Tconversion = (TAD * SAMC) + (TAD * 12)
-	// Frecuencia de muestreo = 1 / Tiempo Total
-
-	IPC6bits.AD1IP = 6;		// ADC 1 Prioridad de interrupcion
-	IPC6bits.AD1IS = 3;		// ADC 1 Subprioridad
-	IFS1CLR = 2;
-	IEC1bits.AD1IE = 1;		// Habilitamos la interrupcion del ADC
-	AD1CON1bits.ON = 1;		// Habilitamos el ADC
+	AD1CON1SET = 0x8000;
+	AD1CON1SET = 0x0004;
 }
