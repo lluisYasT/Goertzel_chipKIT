@@ -5,8 +5,8 @@
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
-#define Fs			62500
-#define N_MUESTRAS	256
+#define Fs			234375			// Se supone que la calculada deberia ser 62500 (esta es 3.75 superior)
+#define N_MUESTRAS	2000
 #define PI			3.141592653589793
 
 int16_t muestras[N_MUESTRAS];
@@ -26,12 +26,11 @@ void setup()
 	Serial.begin(115200);
 	config_analog();
 
+	m = 10;
 	omega = (2.0 * PI * m) / N_MUESTRAS;
 	coseno = cos(omega);
 	seno = sin(omega);
 	coef = 2 * coseno;
-
-	m = 2;
 
 	frecuencia = m * (float)Fs / N_MUESTRAS;
 	sprintf(frec, "%.1f Hz",frecuencia);
@@ -44,6 +43,8 @@ void loop()
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
 		muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
+		//Serial.print(muestras[i]);
+		//Serial.print(',');
 	}
 
 	float w, w_1 = 0, w_2 = 0;
