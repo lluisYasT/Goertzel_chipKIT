@@ -1,11 +1,10 @@
-
 #include <p32xxxx.h>    
 #include <plib.h>       
 
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
-#define Fs			234375			// Se supone que la calculada deberia ser 62500 (esta es 3.75 superior)
+#define Fs			116000			// Se supone que la calculada deberia ser 125000 (esta es 3.75 superior)
 #define N_MUESTRAS	2000
 #define PI			3.141592653589793
 
@@ -26,7 +25,7 @@ void setup()
 	Serial.begin(115200);
 	config_analog();
 
-	m = 10;
+	m = 20;
 	omega = (2.0 * PI * m) / N_MUESTRAS;
 	coseno = cos(omega);
 	seno = sin(omega);
@@ -108,10 +107,10 @@ void config_analog()
 	AD1CON1bits.ASAM = 1; // El muestreo comienza cuando inmediatamente despues de la conversion.
 
 	// Seleccion el reloj del ADC
-	// TPB = (1 / 80MHz) * 2 = 25ns <- Periodo del reloj del bus de perifericos
-	// TAD = TPB * (ADCS + 1) * 2 = 25ns * 20  * 2 = 1000ns
+	// TPB = (1 / 80MHz) = 12.5ns <- Periodo del reloj del bus de perifericos
+	// TAD = TPB * (ADCS + 1) * 2 = 12.5ns * 20  * 2 = 500ns
 	// TAD = 25ns * 160 * 2 = 8000ns
-	AD1CON3bits.ADCS = 19;
+	AD1CON3bits.ADCS = 40;
 
 	// Tiempo de Auto muestreo
 	// SAMC * TAD = 30 * 1000ns = 30uS
