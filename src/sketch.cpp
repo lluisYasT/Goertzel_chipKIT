@@ -43,8 +43,11 @@ void loop()
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
 		muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
-		//Serial.print(muestras[i]);
-		//Serial.print(',');
+
+		// Enviamos datos por puerto serie por si queremos analizarlo usando gnuplot, Octave o Matlab
+		//Serial.print(i);
+		//Serial.print('\t');
+		//Serial.println(muestras[i]);
 	}
 
 	float w, w_1 = 0, w_2 = 0;
@@ -73,7 +76,7 @@ void loop()
 	sprintf(pot, "%.2f", potencia);
 	IOShieldOled.putString(pot);
 
-	delay(50);
+	//delay(50);
 
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
 }
