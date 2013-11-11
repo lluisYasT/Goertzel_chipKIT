@@ -24,13 +24,12 @@ void setup()
 {
 	//IOShieldOled.begin();
 	Serial.begin(115200);
-
+	
+	m = 5;
 	omega = (2.0 * PI * m) / N_MUESTRAS;
 	coseno = cos(omega);
 	seno = sin(omega);
 	coef = 2 * coseno;
-
-	m = 5;
 
 	frecuencia = m * (float)Fs / N_MUESTRAS;
 	sprintf(frec, "%.1f Hz",frecuencia);
@@ -41,16 +40,16 @@ void setup()
 void loop()
 {
 	
-	while(contador_muestras < N_MUESTRAS) {
+	while(contador_muestras <= N_MUESTRAS) {
 		while(!IFS1 & 0x0002){};					// Ha acabado la conversion?
-		muestras[contador_muestras++] = ADC1BUF0;	// Guardamos el primer valor del ADC
+		muestras[++contador_muestras] = ADC1BUF0;	// Guardamos el primer valor del ADC
 		IFS1CLR = 0x0002;							// Reiniciamos AD1F
 	}
 	contador_muestras = 0;
 
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
-		muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
+		//muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
 		Serial.print(muestras[i]);
 		Serial.print(',');
 	}
@@ -94,12 +93,12 @@ void config_analog()
 
 	AD1CSSL = 0;
 	AD1CON3 = 0x0001;			// Tiempo de muestreo es TMR3, TAD = TPB (interno) * 4 = 100ns
-	AD1CON2 = 0x0001;			// Interrupcion cuando tenga 1 conversion
+	AD1CON2 = 0x0000;			// Interrupcion cuando tenga 2 conversiones
 
-	// Configuramos TMR3 para que venza cada 50 us
+	// Configuramos TMR3 para que venza cada 10 us
 	TMR3 	= 0x0000;
-	PR3 	= 0x01F4;			// 500 decimal
-	T3CON 	= 0x8010;
+	PR3 	= 0x0001;			// 100 decimal
+	T3CON 	= 0x8000;
 
 	AD1CON1SET = 0x8000;
 	AD1CON1SET = 0x0004;
