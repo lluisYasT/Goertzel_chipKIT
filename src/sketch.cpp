@@ -4,7 +4,7 @@
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
-#define Fs			116000			// Se supone que la calculada deberia ser 125000 (esta es 3.75 superior)
+#define Fs			116000			
 #define N_MUESTRAS	2000
 #define PI			3.141592653589793
 
