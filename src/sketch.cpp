@@ -31,7 +31,7 @@ void setup()
 	seno = sin(omega);
 	coef = 2 * coseno;
 
-	frecuencia = m * (float)Fs / N_MUESTRAS;
+	frecuencia = m * Fs / N_MUESTRAS;
 	sprintf(frec, "%.1f Hz",frecuencia);
 }
 
@@ -39,14 +39,22 @@ void loop()
 {
 	while(!muestras_listas);
 	muestras_listas = false;
+	float max = 0;
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
-		muestras_norm[i] = ((float)muestras[i] - 512.0) / 512.0;
+		muestras_norm[i] = ((float)muestras[i] - 511.0);
 
+		if(abs(muestras_norm[i]) > max) max = muestras_norm[i];
 		// Enviamos datos por puerto serie por si queremos analizarlo usando gnuplot, Octave o Matlab
 		//Serial.print(i);
 		//Serial.print('\t');
 		//Serial.println(muestras[i]);
+	}
+
+	// normalizamos usando la muestra de valor maximo
+	// para intentar independizarlo de la potencia recibida
+	for (int i = 0; i < N_MUESTRAS; i++) {
+		muestras_norm[i] /= max;
 	}
 
 	float w, w_1 = 0, w_2 = 0;
