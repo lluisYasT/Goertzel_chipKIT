@@ -18,7 +18,7 @@ float muestras_norm[N_MUESTRAS];
 volatile bool muestras_listas = false;
 volatile uint16_t contador_muestras = 0;
 float m;
-float omega, coseno, seno, coef, frecuencia;
+float omega, coseno, seno, coef;
 char frec[12];
 
 void config_analog(void);
@@ -168,6 +168,7 @@ void calculo_coeficientes()
 	seno = sin(omega);
 	coef = 2 * coseno;
 
-	frecuencia = m * Fs / N_MUESTRAS;
-	sprintf(frec, "%.1f Hz",frecuencia);
+	int frecuencia = m * Fs / N_MUESTRAS;
+	int precision = Fs / N_MUESTRAS / 2;
+	sprintf(frec, "%d+-%d Hz",frecuencia, precision);
 }
