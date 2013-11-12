@@ -4,9 +4,13 @@
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
-#define Fs			116000			
+#define Fs					116000			
 #define N_MUESTRAS	2000
-#define PI			3.141592653589793
+#define PI					3.141592653589793
+#define UMBRAL			550									//Potencia minima deteccion tono
+
+#define PIN_UP			4
+#define PIN_DOWN		78
 
 int16_t muestras[N_MUESTRAS];
 float muestras_norm[N_MUESTRAS];
@@ -18,21 +22,16 @@ float omega, coseno, seno, coef, frecuencia;
 char frec[12];
 
 void config_analog(void);
+void calculo_coeficientes(void);
 
 void setup()
 {
 	IOShieldOled.begin();
 	Serial.begin(115200);
 	config_analog();
-
-	m = 20;
-	omega = (2.0 * PI * m) / N_MUESTRAS;
-	coseno = cos(omega);
-	seno = sin(omega);
-	coef = 2 * coseno;
-
-	frecuencia = m * Fs / N_MUESTRAS;
-	sprintf(frec, "%.1f Hz",frecuencia);
+	
+	m = 10;		// Valor por defecto
+	calculo_coeficientes();
 }
 
 void loop()
@@ -82,8 +81,33 @@ void loop()
 	IOShieldOled.setCursor(0,1);
 	sprintf(pot, "%.2f", potencia);
 	IOShieldOled.putString(pot);
+	if(max > 510)
+	{
+		IOShieldOled.setCursor(0,2);
+		IOShieldOled.putString("Saturacion!!");
+	}
 
-	//delay(50);
+	if(potencia > UMBRAL)
+	{
+		IOShieldOled.moveTo(0,0);
+		IOShieldOled.drawRect(127,31);
+		IOShieldOled.updateDisplay();
+	}
+
+	if(digitalRead(PIN_DOWN) && m > 0)
+	{
+		m--;
+		calculo_coeficientes();
+		delay(200);
+	}
+	// Podemos aumentar la frecuencia hasta Fs/2 ya que a partir de ahi
+	// se produce aliasing
+	if(digitalRead(PIN_UP) && m < N_MUESTRAS/2 - 1)
+	{
+		m++;
+		calculo_coeficientes();
+		delay(200);
+	}
 
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
 }
@@ -134,4 +158,16 @@ void config_analog()
 	IFS1CLR = 2;
 	IEC1bits.AD1IE = 1;		// Habilitamos la interrupcion del ADC
 	AD1CON1bits.ON = 1;		// Habilitamos el ADC
+}
+
+void calculo_coeficientes()
+{
+
+	omega = (2.0 * PI * m) / N_MUESTRAS;
+	coseno = cos(omega);
+	seno = sin(omega);
+	coef = 2 * coseno;
+
+	frecuencia = m * Fs / N_MUESTRAS;
+	sprintf(frec, "%.1f Hz",frecuencia);
 }
