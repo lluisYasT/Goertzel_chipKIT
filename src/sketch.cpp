@@ -56,6 +56,7 @@ void loop()
 		muestras_norm[i] /= max;
 	}
 
+	// Comeinza Goertzel
 	float w, w_1 = 0, w_2 = 0;
 
 	for (int i = 0; i < N_MUESTRAS; ++i)
@@ -72,6 +73,7 @@ void loop()
 	float real = (w_1 - w_2 * coseno);
 	float imag = (w_2 * seno);
 	float potencia = sqrt(real * real + imag * imag);
+	// Fin Goertzel
 
 	IOShieldOled.clear();
 	IOShieldOled.setCursor(0,0);
@@ -112,6 +114,7 @@ void loop()
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
 }
 
+// Interrupcion del ADC
 extern "C"
 {
 	void __ISR(_ADC_VECTOR, ipl6) ADCInterruptHandler()
@@ -157,6 +160,9 @@ void config_analog()
 	AD1CON1bits.ON = 1;		// Habilitamos el ADC
 }
 
+// Calculo de los coeficientes necesarios para Goertzel.
+// Intentamos calcularlos solamente en el comienzo del programa
+// y cuando cambiemos el valor de m.
 void calculo_coeficientes()
 {
 
