@@ -140,14 +140,11 @@ void config_analog()
 
 	// Seleccion el reloj del ADC
 	// TPB = (1 / 80MHz) = 12.5ns <- Periodo del reloj del bus de perifericos
-	// TAD = TPB * (ADCS + 1) * 2 = 12.5ns * 20  * 2 = 500ns
-	// TAD = 25ns * 160 * 2 = 8000ns
+	// TAD = TPB * (ADCS + 1) * 2
 	AD1CON3bits.ADCS = 40;
 
 	// Tiempo de Auto muestreo
-	// SAMC * TAD = 30 * 1000ns = 30uS
-	// SAMC * TAD = 31 * 8000ns = 248uS
-	// SAMC * TAD = 25 * 1000ns = 25us
+	// Tmuestreo = SAMC * TAD
 	AD1CON3bits.SAMC = 4;
 
 	// Tiempo total = Tmuestreo + Tconversion = (TAD * SAMC) + (TAD * 12)
