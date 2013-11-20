@@ -4,21 +4,23 @@
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
+#define GAIN_BITS		15
+#define GAIN				(1<<GAIN_BITS)
 #define Fs					116000			
-#define N_MUESTRAS	2000
-#define PI					3.141592653589793
+#define N_MUESTRAS	200
+#define PI					3141592653589793 
 #define UMBRAL			550									//Potencia minima deteccion tono
 
 #define PIN_UP			4
 #define PIN_DOWN		78
 
 int16_t muestras[N_MUESTRAS];
-float muestras_norm[N_MUESTRAS];
+int muestras_norm[N_MUESTRAS];
 
 volatile bool muestras_listas = false;
 volatile uint16_t contador_muestras = 0;
-float m;
-float omega, coseno, seno, coef;
+int m;
+int omega, coseno, seno, coef;
 char frec[12];
 
 void config_analog(void);
@@ -38,10 +40,11 @@ void loop()
 {
 	while(!muestras_listas);
 	muestras_listas = false;
-	float max = 0;
+	int max = 0;
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
-		muestras_norm[i] = ((float)muestras[i] - 511.0);
+		muestras_norm[i] = muestras[i] - 511.0;
+		muestras_norm[i] = muestras_norm[i] << (GAIN_BITS - 10);
 
 		if(abs(muestras_norm[i]) > max) max = muestras_norm[i];
 		// Enviamos datos por puerto serie por si queremos analizarlo usando gnuplot, Octave o Matlab
@@ -57,7 +60,7 @@ void loop()
 	}
 
 	// Comeinza Goertzel
-	float w, w_1 = 0, w_2 = 0;
+	int w, w_1 = 0, w_2 = 0;
 
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
@@ -70,9 +73,10 @@ void loop()
 	w_2 = w_1;
 	w_1 = w;
 
-	float real = (w_1 - w_2 * coseno);
-	float imag = (w_2 * seno);
-	float potencia = sqrt(real * real + imag * imag);
+	int real = (w_1 - w_2 * coseno);
+	int imag = (w_2 * seno);
+	int potencia = sqrt(real * real + imag * imag);
+	potencia = potencia >> GAIN_BITS;
 	// Fin Goertzel
 
 	IOShieldOled.clear();
@@ -83,7 +87,7 @@ void loop()
 	IOShieldOled.setCursor(0,1);
 	sprintf(pot, "%.2f", potencia);
 	IOShieldOled.putString(pot);
-	if(max > 510)
+	if(max > 510 << GAIN_BITS)
 	{
 		IOShieldOled.setCursor(0,2);
 		IOShieldOled.putString("Saturacion!!");
@@ -166,9 +170,12 @@ void config_analog()
 void calculo_coeficientes()
 {
 
-	omega = (2.0 * PI * m) / N_MUESTRAS;
-	coseno = cos(omega);
-	seno = sin(omega);
+	float aux;
+	omega = (2 * PI * m) / N_MUESTRAS;
+	aux = cos(omega);
+	coseno = (int)(aux * GAIN);
+	aux = sin(omega);
+	seno = (int)(aux * GAIN);
 	coef = 2 * coseno;
 
 	int frecuencia = m * Fs / N_MUESTRAS;
