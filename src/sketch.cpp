@@ -29,11 +29,13 @@ int m;
 float omega;
 //int coseno, seno, coef;
 char frec[12];
+int max = 0;
+int q0, q1 = 0, q2 = 0;
 
 void config_analog(void);
 //void calculo_coeficientes(void);
 
-int goertzel(void);
+int fin_goertzel(void);
 
 void setup()
 {
@@ -49,7 +51,7 @@ void loop()
 {
 	while(!muestras_listas);
 	muestras_listas = false;
-	int max = 0;
+	/*
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
 		muestras_norm[i] = muestras[i] - 512;
@@ -64,8 +66,9 @@ void loop()
 		//Serial.print(muestras_norm[i]);
 		//Serial.print(',');
 	}
+	*/
 
-	int potencia = goertzel();
+	int potencia = fin_goertzel();
 
 	IOShieldOled.clear();
 	IOShieldOled.setCursor(0,0);
@@ -112,6 +115,7 @@ void loop()
 		delay(200);
 	}
 	*/
+	max = 0;
 
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
 }
@@ -123,7 +127,26 @@ extern "C"
 	{
 		IFS1CLR = 2;
 
-		muestras[contador_muestras++] = ADC1BUF0;
+		int muestra = ADC1BUF0;
+		muestra = muestra - 512;
+		muestra = muestra << (GAIN_BITS - 9);
+		muestra *= ATENUADOR;
+		muestra >>= GAIN_BITS;
+		
+		if(muestra > max) {
+			max = muestra;
+		}
+
+
+		q0 = (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += muestra;
+		q2 = q1;
+		q1 = q0;
+
+		contador_muestras++;
 
 		if(contador_muestras >= N_MUESTRAS)
 		{
@@ -182,22 +205,8 @@ void calculo_coeficientes()
 }
 */
 
-int goertzel()
+int fin_goertzel()
 {
-
-	int q0, q1 = 0, q2 = 0;
-
-	for (int i = 0; i < N_MUESTRAS; ++i)
-	{
-		q0 = (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += muestras_norm[i];
-		q2 = q1;
-		q1 = q0;
-
-	}
 
 
 	q0 = (COSENO * q1) >> GAIN_BITS;
@@ -216,6 +225,9 @@ int goertzel()
 
 	int potencia = real + imag;
 	
+	q0 = 0;
+	q1 = 0;
+	q2 = 0;
 	return potencia;
 
 }
