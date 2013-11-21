@@ -31,7 +31,9 @@ float omega;
 char frec[12];
 
 void config_analog(void);
-void calculo_coeficientes(void);
+//void calculo_coeficientes(void);
+
+int goertzel(void);
 
 void setup()
 {
@@ -59,50 +61,11 @@ void loop()
 			max = muestras_norm[i];
 		}
 
-		//if(abs(muestras_norm[i]) > max) max = muestras_norm[i];
-		// Enviamos datos por puerto serie por si queremos analizarlo usando gnuplot, Octave o Matlab
-		//Serial.print(i);
-		//Serial.print('\t');
 		//Serial.print(muestras_norm[i]);
 		//Serial.print(',');
 	}
 
-	// Comeinza Goertzel
-	
-	int q0, q1 = 0, q2 = 0;
-
-	for (int i = 0; i < N_MUESTRAS; ++i)
-	{
-		q0 = (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += muestras_norm[i];
-		q2 = q1;
-		q1 = q0;
-
-	}
-
-
-	q0 = (COSENO * q1) >> GAIN_BITS;
-	q0 -= (MITAD * q2) >> GAIN_BITS;
-	q0 += (COSENO * q1) >> GAIN_BITS;
-	q0 -= (MITAD * q2) >> GAIN_BITS;
-	q2 = q1;
-	q1 = q0;
-
-	int real = q1;
-	real -= (COSENO * q1) >> GAIN_BITS;
-	real = (real * real) >> GAIN_BITS;
-
-	int imag = (SENO * q2) >> GAIN_BITS;
-	imag = (imag * imag) >> GAIN_BITS;
-
-	int potencia = real + imag;
-
-
-	//	potencia = potencia >> GAIN_BITS;
-	// Fin Goertzel
+	int potencia = goertzel();
 
 	IOShieldOled.clear();
 	IOShieldOled.setCursor(0,0);
@@ -218,3 +181,41 @@ void calculo_coeficientes()
 	sprintf(frec, "%d+-%d Hz",frecuencia, precision);
 }
 */
+
+int goertzel()
+{
+
+	int q0, q1 = 0, q2 = 0;
+
+	for (int i = 0; i < N_MUESTRAS; ++i)
+	{
+		q0 = (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += muestras_norm[i];
+		q2 = q1;
+		q1 = q0;
+
+	}
+
+
+	q0 = (COSENO * q1) >> GAIN_BITS;
+	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q0 += (COSENO * q1) >> GAIN_BITS;
+	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q2 = q1;
+	q1 = q0;
+
+	int real = q1;
+	real -= (COSENO * q1) >> GAIN_BITS;
+	real = (real * real) >> GAIN_BITS;
+
+	int imag = (SENO * q2) >> GAIN_BITS;
+	imag = (imag * imag) >> GAIN_BITS;
+
+	int potencia = real + imag;
+	
+	return potencia;
+
+}
