@@ -4,12 +4,18 @@
 #include <WProgram.h>
 #include <IOShieldOled.h>
 
+#include "sin_1_2.h"
+
 #define GAIN_BITS		15
 #define GAIN				(1<<GAIN_BITS)
-#define Fs					116000			
-#define N_MUESTRAS	200
-#define PI					3141592653589793 
-#define UMBRAL			550									//Potencia minima deteccion tono
+#define Fs					8000			
+#define N_MUESTRAS	800
+#define PI					3.141592653589793 
+#define COSENO			19261	// 0.5878 * 2^15 1.2kHz
+#define SENO				26510 // 0.809 * 2^15
+#define MITAD				16384 // 0.5 * 2^15
+#define ATENUADOR		57		// Para no saturar
+#define UMBRAL			2949	// 0.3^2 * 2^15
 
 #define PIN_UP			4
 #define PIN_DOWN		78
@@ -20,7 +26,8 @@ int muestras_norm[N_MUESTRAS];
 volatile bool muestras_listas = false;
 volatile uint16_t contador_muestras = 0;
 int m;
-int omega, coseno, seno, coef;
+float omega;
+//int coseno, seno, coef;
 char frec[12];
 
 void config_analog(void);
@@ -32,8 +39,8 @@ void setup()
 	Serial.begin(115200);
 	config_analog();
 	
-	m = 10;		// Valor por defecto
-	calculo_coeficientes();
+	//m = 10;		// Valor por defecto
+	//calculo_coeficientes();
 }
 
 void loop()
@@ -43,63 +50,90 @@ void loop()
 	int max = 0;
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
-		muestras_norm[i] = muestras[i] - 511.0;
-		muestras_norm[i] = muestras_norm[i] << (GAIN_BITS - 10);
+		muestras_norm[i] = muestras[i] - 512;
+		muestras_norm[i] = muestras_norm[i] << (GAIN_BITS - 9);
+		muestras_norm[i] *= ATENUADOR;
+		muestras_norm[i] >>= GAIN_BITS;
+		
+		if(muestras_norm[i] > max) {
+			max = muestras_norm[i];
+		}
 
-		if(abs(muestras_norm[i]) > max) max = muestras_norm[i];
+		//if(abs(muestras_norm[i]) > max) max = muestras_norm[i];
 		// Enviamos datos por puerto serie por si queremos analizarlo usando gnuplot, Octave o Matlab
 		//Serial.print(i);
 		//Serial.print('\t');
-		//Serial.println(muestras[i]);
-	}
-
-	// normalizamos usando la muestra de valor maximo
-	// para intentar independizarlo de la potencia recibida
-	for (int i = 0; i < N_MUESTRAS; i++) {
-		muestras_norm[i] /= max;
+		//Serial.print(muestras_norm[i]);
+		//Serial.print(',');
 	}
 
 	// Comeinza Goertzel
-	int w, w_1 = 0, w_2 = 0;
+	
+	int q0, q1 = 0, q2 = 0;
 
 	for (int i = 0; i < N_MUESTRAS; ++i)
 	{
-		w = muestras_norm[i] + coef * w_1 - w_2;
-		w_2 = w_1;
-		w_1 = w;
+		q0 = (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += muestras_norm[i];
+		q2 = q1;
+		q1 = q0;
+
 	}
 
-	w = coef * w_1 - w_2;
-	w_2 = w_1;
-	w_1 = w;
 
-	int real = (w_1 - w_2 * coseno);
-	int imag = (w_2 * seno);
-	int potencia = sqrt(real * real + imag * imag);
-	potencia = potencia >> GAIN_BITS;
+	q0 = (COSENO * q1) >> GAIN_BITS;
+	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q0 += (COSENO * q1) >> GAIN_BITS;
+	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q2 = q1;
+	q1 = q0;
+
+	int real = q1;
+	real -= (COSENO * q1) >> GAIN_BITS;
+	real = (real * real) >> GAIN_BITS;
+
+	int imag = (SENO * q2) >> GAIN_BITS;
+	imag = (imag * imag) >> GAIN_BITS;
+
+	int potencia = real + imag;
+
+
+	//	potencia = potencia >> GAIN_BITS;
 	// Fin Goertzel
 
 	IOShieldOled.clear();
 	IOShieldOled.setCursor(0,0);
 	
-	IOShieldOled.putString(frec);
+	//IOShieldOled.putString(frec);
 	char pot[8];
 	IOShieldOled.setCursor(0,1);
-	sprintf(pot, "%.2f", potencia);
+	sprintf(pot, "%d", potencia);
 	IOShieldOled.putString(pot);
-	if(max > 510 << GAIN_BITS)
+
+
+	
+	/*
+	if(max > 1 << GAIN_BITS)
 	{
 		IOShieldOled.setCursor(0,2);
 		IOShieldOled.putString("Saturacion!!");
 	}
+	*/
 
-	if(potencia > UMBRAL)
+	max = (max * max) >> GAIN_BITS;
+	max = (max * UMBRAL) >> GAIN_BITS;
+
+	if(potencia > max)
 	{
 		IOShieldOled.moveTo(0,0);
 		IOShieldOled.drawRect(127,31);
 		IOShieldOled.updateDisplay();
 	}
 
+	/*
 	if(digitalRead(PIN_DOWN) && m > 0)
 	{
 		m--;
@@ -114,6 +148,7 @@ void loop()
 		calculo_coeficientes();
 		delay(200);
 	}
+	*/
 
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
 }
@@ -141,18 +176,18 @@ void config_analog()
 	//Configuracion del ADC
 	AD1PCFG = ~1;	// PORTB digital, RB0 analogico
 	AD1CHSbits.CH0SA = 1; // Canal 1. AN1
-	AD1CON2bits.SMPI = 0; // Cantidad de conversiones anates de generar la interrupcion
+	AD1CON2bits.SMPI = 0; // Cantidad de conversiones antes de generar la interrupcion
 	AD1CON1bits.SSRC  = 7; // El contador interno termina el muestreo y comienza la conversion.
-	AD1CON1bits.ASAM = 1; // El muestreo comienza cuando inmediatamente despues de la conversion.
+	AD1CON1bits.ASAM = 1; // El muestreo comienza inmediatamente despues de la conversion.
 
 	// Seleccion el reloj del ADC
 	// TPB = (1 / 80MHz) = 12.5ns <- Periodo del reloj del bus de perifericos
 	// TAD = TPB * (ADCS + 1) * 2
-	AD1CON3bits.ADCS = 40;
+	AD1CON3bits.ADCS = 255;
 
 	// Tiempo de Auto muestreo
 	// Tmuestreo = SAMC * TAD
-	AD1CON3bits.SAMC = 4;
+	AD1CON3bits.SAMC = 26;
 
 	// Tiempo total = Tmuestreo + Tconversion = (TAD * SAMC) + (TAD * 12)
 	// Frecuencia de muestreo = 1 / Tiempo Total
@@ -167,6 +202,7 @@ void config_analog()
 // Calculo de los coeficientes necesarios para Goertzel.
 // Intentamos calcularlos solamente en el comienzo del programa
 // y cuando cambiemos el valor de m.
+/*
 void calculo_coeficientes()
 {
 
@@ -176,9 +212,9 @@ void calculo_coeficientes()
 	coseno = (int)(aux * GAIN);
 	aux = sin(omega);
 	seno = (int)(aux * GAIN);
-	coef = 2 * coseno;
 
 	int frecuencia = m * Fs / N_MUESTRAS;
 	int precision = Fs / N_MUESTRAS / 2;
 	sprintf(frec, "%d+-%d Hz",frecuencia, precision);
 }
+*/
