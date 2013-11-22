@@ -30,7 +30,7 @@ float omega;
 //int coseno, seno, coef;
 char frec[12];
 int max = 0;
-int q0, q1 = 0, q2 = 0;
+volatile int q0, q1 = 0, q2 = 0;
 
 void config_analog(void);
 //void calculo_coeficientes(void);
