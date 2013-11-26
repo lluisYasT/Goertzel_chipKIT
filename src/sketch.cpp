@@ -1,10 +1,7 @@
-#include <p32xxxx.h>    
+//#include <p32xxxx.h>    
 #include <plib.h>       
 
 #include <WProgram.h>
-#include <IOShieldOled.h>
-
-#include "sin_1_2.h"
 
 #define GAIN_BITS		15
 #define GAIN				(1<<GAIN_BITS)
@@ -29,71 +26,34 @@ int m;
 float omega;
 //int coseno, seno, coef;
 char frec[12];
+int max = 0;
+volatile int q0, q1 = 0, q2 = 0;
 
 void config_analog(void);
-//void calculo_coeficientes(void);
 
-int goertzel(void);
+int fin_goertzel(void);
 
 void setup()
 {
-	IOShieldOled.begin();
 	Serial.begin(115200);
 	config_analog();
-	
-	//m = 10;		// Valor por defecto
-	//calculo_coeficientes();
 }
 
 void loop()
 {
 	while(!muestras_listas);
 	muestras_listas = false;
-	int max = 0;
-	for (int i = 0; i < N_MUESTRAS; ++i)
-	{
-		muestras_norm[i] = muestras[i] - 512;
-		muestras_norm[i] = muestras_norm[i] << (GAIN_BITS - 9);
-		muestras_norm[i] *= ATENUADOR;
-		muestras_norm[i] >>= GAIN_BITS;
-		
-		if(muestras_norm[i] > max) {
-			max = muestras_norm[i];
-		}
 
-		//Serial.print(muestras_norm[i]);
-		//Serial.print(',');
-	}
-
-	int potencia = goertzel();
-
-	IOShieldOled.clear();
-	IOShieldOled.setCursor(0,0);
-	
-	//IOShieldOled.putString(frec);
-	char pot[8];
-	IOShieldOled.setCursor(0,1);
-	sprintf(pot, "%d", potencia);
-	IOShieldOled.putString(pot);
-
-
-	
-	/*
-	if(max > 1 << GAIN_BITS)
-	{
-		IOShieldOled.setCursor(0,2);
-		IOShieldOled.putString("Saturacion!!");
-	}
-	*/
+	int potencia = fin_goertzel();
 
 	max = (max * max) >> GAIN_BITS;
 	max = (max * UMBRAL) >> GAIN_BITS;
 
 	if(potencia > max)
 	{
-		IOShieldOled.moveTo(0,0);
-		IOShieldOled.drawRect(127,31);
-		IOShieldOled.updateDisplay();
+		digitalWrite(13,HIGH);
+	} else {
+		digitalWrite(13,LOW);
 	}
 
 	/*
@@ -112,6 +72,7 @@ void loop()
 		delay(200);
 	}
 	*/
+	max = 0;
 
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
 }
@@ -123,7 +84,26 @@ extern "C"
 	{
 		IFS1CLR = 2;
 
-		muestras[contador_muestras++] = ADC1BUF0;
+		int muestra = ADC1BUF0;
+		muestra = muestra - 512;
+		muestra = muestra << (GAIN_BITS - 9);
+		muestra *= ATENUADOR;
+		muestra >>= GAIN_BITS;
+		
+		if(muestra > max) {
+			max = muestra;
+		}
+
+
+		q0 = (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += (COSENO * q1) >> GAIN_BITS;
+		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 += muestra;
+		q2 = q1;
+		q1 = q0;
+
+		contador_muestras++;
 
 		if(contador_muestras >= N_MUESTRAS)
 		{
@@ -162,42 +142,8 @@ void config_analog()
 	AD1CON1bits.ON = 1;		// Habilitamos el ADC
 }
 
-// Calculo de los coeficientes necesarios para Goertzel.
-// Intentamos calcularlos solamente en el comienzo del programa
-// y cuando cambiemos el valor de m.
-/*
-void calculo_coeficientes()
+int fin_goertzel()
 {
-
-	float aux;
-	omega = (2 * PI * m) / N_MUESTRAS;
-	aux = cos(omega);
-	coseno = (int)(aux * GAIN);
-	aux = sin(omega);
-	seno = (int)(aux * GAIN);
-
-	int frecuencia = m * Fs / N_MUESTRAS;
-	int precision = Fs / N_MUESTRAS / 2;
-	sprintf(frec, "%d+-%d Hz",frecuencia, precision);
-}
-*/
-
-int goertzel()
-{
-
-	int q0, q1 = 0, q2 = 0;
-
-	for (int i = 0; i < N_MUESTRAS; ++i)
-	{
-		q0 = (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += muestras_norm[i];
-		q2 = q1;
-		q1 = q0;
-
-	}
 
 
 	q0 = (COSENO * q1) >> GAIN_BITS;
@@ -216,6 +162,9 @@ int goertzel()
 
 	int potencia = real + imag;
 	
+	q0 = 0;
+	q1 = 0;
+	q2 = 0;
 	return potencia;
 
 }
