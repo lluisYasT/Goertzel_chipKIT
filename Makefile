@@ -35,6 +35,7 @@ CFLAGS=-O2 -mno-smart-io -w -fno-exceptions -ffunction-sections -fdata-sections 
 			 -mdebugger -Wcast-align -fno-short-double -mprocessor=$(CPUTYPE) \
 			 -DF_CPU=80000000L -DARDUINO=23 -D_BOARD_MEGA_ -DMPIDEVER=0x01000305 \
 			 -DMPIDE=23 -Icore -Icore/variants/$(VARIANT) -Isrc
+CFLAGS+=-mno-float
 
 LIBS := $(sort ${dir ${wildcard ./lib/*/ ./lib/*/*/ ./lib/*/*/*/}})
 
