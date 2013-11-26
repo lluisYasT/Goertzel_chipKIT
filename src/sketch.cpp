@@ -5,38 +5,43 @@
 
 #define GAIN_BITS		15
 #define GAIN				(1<<GAIN_BITS)
-#define Fs					8000			
 #define N_MUESTRAS	800
-#define PI					3.141592653589793 
 #define COSENO			19261	// 0.5878 * 2^15 1.2kHz
 #define SENO				26510 // 0.809 * 2^15
 #define MITAD				16384 // 0.5 * 2^15
 #define ATENUADOR		57		// Para no saturar
 #define UMBRAL			2949	// 0.3^2 * 2^15
 
-#define PIN_UP			4
-#define PIN_DOWN		78
-
-int16_t muestras[N_MUESTRAS];
-int muestras_norm[N_MUESTRAS];
-
 volatile bool muestras_listas = false;
 volatile uint16_t contador_muestras = 0;
-int m;
-float omega;
-//int coseno, seno, coef;
-char frec[12];
-int max = 0;
+volatile int max = 0;
 volatile int q0, q1 = 0, q2 = 0;
-
-void config_analog(void);
-
-int fin_goertzel(void);
 
 void setup()
 {
-	Serial.begin(115200);
-	config_analog();
+	//Configuracion del ADC
+	AD1PCFG = ~1;	// PORTB digital, RB0 analogico
+	AD1CHSbits.CH0SA = 1; // Canal 1. AN1
+	AD1CON2bits.SMPI = 0; // Cantidad de conversiones antes de generar la interrupcion
+	AD1CON1bits.SSRC  = 7; // El contador interno termina el muestreo y comienza la conversion.
+	AD1CON1bits.ASAM = 1; // El muestreo comienza inmediatamente despues de la conversion.
+
+	// Seleccion el reloj del ADC
+	// TPB = (1 / 80MHz) = 12.5ns <- Periodo del reloj del bus de perifericos
+	// TAD = TPB * (ADCS + 1) * 2
+	AD1CON3bits.ADCS = 255;
+
+	// Tiempo de Auto muestreo
+	// Tmuestreo = SAMC * TAD
+	AD1CON3bits.SAMC = 26;
+
+	// Frecuencia de muestreo = 8kHz
+
+	IPC6bits.AD1IP = 6;		// ADC 1 Prioridad de interrupcion
+	IPC6bits.AD1IS = 3;		// ADC 1 Subprioridad
+	IFS1CLR = 2;
+	IEC1bits.AD1IE = 1;		// Habilitamos la interrupcion del ADC
+	AD1CON1bits.ON = 1;		// Habilitamos el ADC
 }
 
 void loop()
@@ -44,11 +49,32 @@ void loop()
 	while(!muestras_listas);
 	muestras_listas = false;
 
-	int potencia = fin_goertzel();
+	// Parte no recursiva de Goertzel
+	q0 = (COSENO * q1) >> GAIN_BITS;
+	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q0 += (COSENO * q1) >> GAIN_BITS;
+	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q2 = q1;
+	q1 = q0;
 
+	// Calculo la potencia
+	int real = q1;
+	real -= (COSENO * q1) >> GAIN_BITS;
+	real = (real * real) >> GAIN_BITS;
+
+	int imag = (SENO * q2) >> GAIN_BITS;
+	imag = (imag * imag) >> GAIN_BITS;
+	
+	q1 = 0;
+	q2 = 0;
+	int potencia = real + imag;
+
+	// Valor con el que comparamos la potencia 
+	// para saber si hay tono
 	max = (max * max) >> GAIN_BITS;
 	max = (max * UMBRAL) >> GAIN_BITS;
 
+	// Si hay tono encendemos el LED de la placa
 	if(potencia > max)
 	{
 		digitalWrite(13,HIGH);
@@ -56,22 +82,6 @@ void loop()
 		digitalWrite(13,LOW);
 	}
 
-	/*
-	if(digitalRead(PIN_DOWN) && m > 0)
-	{
-		m--;
-		calculo_coeficientes();
-		delay(200);
-	}
-	// Podemos aumentar la frecuencia hasta Fs/2 ya que a partir de ahi
-	// se produce aliasing
-	if(digitalRead(PIN_UP) && m < N_MUESTRAS/2 - 1)
-	{
-		m++;
-		calculo_coeficientes();
-		delay(200);
-	}
-	*/
 	max = 0;
 
 	AD1CON1bits.ASAM = 1; // Comienza auto-muestreo
@@ -112,59 +122,4 @@ extern "C"
 			AD1CON1bits.ASAM = 0; // Paramos el automuestreo
 		}
 	}
-}
-
-void config_analog()
-{
-	//Configuracion del ADC
-	AD1PCFG = ~1;	// PORTB digital, RB0 analogico
-	AD1CHSbits.CH0SA = 1; // Canal 1. AN1
-	AD1CON2bits.SMPI = 0; // Cantidad de conversiones antes de generar la interrupcion
-	AD1CON1bits.SSRC  = 7; // El contador interno termina el muestreo y comienza la conversion.
-	AD1CON1bits.ASAM = 1; // El muestreo comienza inmediatamente despues de la conversion.
-
-	// Seleccion el reloj del ADC
-	// TPB = (1 / 80MHz) = 12.5ns <- Periodo del reloj del bus de perifericos
-	// TAD = TPB * (ADCS + 1) * 2
-	AD1CON3bits.ADCS = 255;
-
-	// Tiempo de Auto muestreo
-	// Tmuestreo = SAMC * TAD
-	AD1CON3bits.SAMC = 26;
-
-	// Tiempo total = Tmuestreo + Tconversion = (TAD * SAMC) + (TAD * 12)
-	// Frecuencia de muestreo = 1 / Tiempo Total
-
-	IPC6bits.AD1IP = 6;		// ADC 1 Prioridad de interrupcion
-	IPC6bits.AD1IS = 3;		// ADC 1 Subprioridad
-	IFS1CLR = 2;
-	IEC1bits.AD1IE = 1;		// Habilitamos la interrupcion del ADC
-	AD1CON1bits.ON = 1;		// Habilitamos el ADC
-}
-
-int fin_goertzel()
-{
-
-
-	q0 = (COSENO * q1) >> GAIN_BITS;
-	q0 -= (MITAD * q2) >> GAIN_BITS;
-	q0 += (COSENO * q1) >> GAIN_BITS;
-	q0 -= (MITAD * q2) >> GAIN_BITS;
-	q2 = q1;
-	q1 = q0;
-
-	int real = q1;
-	real -= (COSENO * q1) >> GAIN_BITS;
-	real = (real * real) >> GAIN_BITS;
-
-	int imag = (SENO * q2) >> GAIN_BITS;
-	imag = (imag * imag) >> GAIN_BITS;
-
-	int potencia = real + imag;
-	
-	q0 = 0;
-	q1 = 0;
-	q2 = 0;
-	return potencia;
-
 }
