@@ -1,6 +1,4 @@
-//#include <p32xxxx.h>    
 #include <plib.h>       
-
 #include <WProgram.h>
 
 #define GAIN_BITS		15
