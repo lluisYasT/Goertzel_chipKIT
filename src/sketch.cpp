@@ -102,7 +102,7 @@ extern "C"
 			max = muestra;
 		}
 
-
+		// Parte recursiva de Goertzel
 		q0 = (COSENO * q1) >> GAIN_BITS;
 		q0 -= (MITAD * q2) >> GAIN_BITS;
 		q0 += (COSENO * q1) >> GAIN_BITS;
