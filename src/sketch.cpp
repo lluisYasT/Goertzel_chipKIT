@@ -48,10 +48,11 @@ void loop()
 	muestras_listas = false;
 
 	// Parte no recursiva de Goertzel
-	q0 = (COSENO * q1) >> GAIN_BITS;
-	q0 -= (MITAD * q2) >> GAIN_BITS;
-	q0 += (COSENO * q1) >> GAIN_BITS;
-	q0 -= (MITAD * q2) >> GAIN_BITS;
+	q0 = (COSENO * q1);
+	q0 -= (MITAD * q2);
+	q0 += (COSENO * q1);
+	q0 -= (MITAD * q2);
+	q0 >>= GAIN_BITS;
 	q2 = q1;
 	q1 = q0;
 
@@ -103,10 +104,11 @@ extern "C"
 		}
 
 		// Parte recursiva de Goertzel
-		q0 = (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
-		q0 += (COSENO * q1) >> GAIN_BITS;
-		q0 -= (MITAD * q2) >> GAIN_BITS;
+		q0 = (COSENO * q1);
+		q0 -= (MITAD * q2);
+		q0 += (COSENO * q1);
+		q0 -= (MITAD * q2);
+		q0 >>= GAIN_BITS;
 		q0 += muestra;
 		q2 = q1;
 		q1 = q0;
