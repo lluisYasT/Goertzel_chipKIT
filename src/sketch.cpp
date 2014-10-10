@@ -40,6 +40,8 @@ void setup()
 	IFS1CLR = 2;
 	IEC1bits.AD1IE = 1;		// Habilitamos la interrupcion del ADC
 	AD1CON1bits.ON = 1;		// Habilitamos el ADC
+
+	pinMode(PIN_LED1, OUTPUT);
 }
 
 void loop()
@@ -76,9 +78,9 @@ void loop()
 	// Si hay tono encendemos el LED de la placa
 	if(potencia > max)
 	{
-		digitalWrite(13,HIGH);
+		digitalWrite(PIN_LED1,HIGH);
 	} else {
-		digitalWrite(13,LOW);
+		digitalWrite(PIN_LED1,LOW);
 	}
 
 	max = 0;
